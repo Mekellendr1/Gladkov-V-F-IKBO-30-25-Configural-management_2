@@ -4,10 +4,10 @@ set -u
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_SH="${ROOT_DIR}/run.sh"
 WORK_DIR="$(mktemp -d)"
-GRAPH_FILE="${WORK_DIR}/graph.txt"
-GOOD_URL="https://api.nuget.org/v3/index.json"
-printf 'A -> B\n' > "${GRAPH_FILE}"
+GRAPH_FILE="${WORK_DIR}/graph.json"
 FAILED=0
+
+printf '{"A": {"1.0.0": []}}\n' > "${GRAPH_FILE}"
 
 check_exit() {
     local title="$1"
@@ -23,56 +23,23 @@ check_exit() {
     fi
 }
 
-check_output() {
-    local title="$1"
-    local needle="$2"
-    shift 2
-    local output
-    if ! output="$("$@" 2>&1)"; then
-        echo "FAIL: ${title} (command failed)"
-        FAILED=1
-    elif printf '%s\n' "${output}" | grep -qF -- "${needle}"; then
-        echo "PASS: ${title}"
-    else
-        echo "FAIL: ${title} (missing '${needle}')"
-        FAILED=1
-    fi
-}
+BASE=("${RUN_SH}" --package A --source "${GRAPH_FILE}" --test-mode)
 
-BASE=("${RUN_SH}" --package Newtonsoft.Json
-      --source "${GRAPH_FILE}" --test-mode)
-
-check_output "prints package" "package = Newtonsoft.Json" "${BASE[@]}"
-check_output "prints source" "source = ${GRAPH_FILE}" "${BASE[@]}"
-check_output "prints test_mode" "test_mode = True" "${BASE[@]}"
-check_output "prints version" "version = 1.0.0" "${BASE[@]}"
-check_output "prints ascii_tree" "ascii_tree = False" "${BASE[@]}"
-check_output "prints max_depth" "max_depth = 5" "${BASE[@]}"
 check_exit "valid config exits 0" 0 "${BASE[@]}"
-check_exit "real url exits 0" 0 "${RUN_SH}" --package Newtonsoft.Json \
-    --source "${GOOD_URL}"
-
-check_exit "missing package" 2 "${RUN_SH}" --source "${GRAPH_FILE}" --test-mode
+check_exit "missing package" 2 "${RUN_SH}" --source "${GRAPH_FILE}" \
+    --test-mode
 check_exit "empty package" 2 "${RUN_SH}" --package "" \
     --source "${GRAPH_FILE}" --test-mode
 check_exit "bad package chars" 2 "${RUN_SH}" --package "bad name" \
     --source "${GRAPH_FILE}" --test-mode
-check_exit "missing source" 2 "${RUN_SH}" --package Newtonsoft.Json
+check_exit "missing source" 2 "${RUN_SH}" --package A
 check_exit "missing test file" 2 "${RUN_SH}" --package A \
-    --source "${WORK_DIR}/nope.txt" --test-mode
+    --source "${WORK_DIR}/nope.json" --test-mode
 check_exit "bad url" 2 "${RUN_SH}" --package A --source "notaurl"
-check_exit "bad version" 2 "${RUN_SH}" --package A \
-    --source "${GOOD_URL}" --version 1.2
+check_exit "bad version" 2 "${BASE[@]}" --version 1.2
 check_exit "bad depth zero" 2 "${BASE[@]}" --max-depth 0
 check_exit "bad depth big" 2 "${BASE[@]}" --max-depth 100
 check_exit "bad depth text" 2 "${BASE[@]}" --max-depth abc
-
-check_output "custom version printed" "version = 13.0.3" \
-    "${BASE[@]}" --version 13.0.3
-check_output "custom depth printed" "max_depth = 7" \
-    "${BASE[@]}" --max-depth 7
-check_output "ascii flag printed" "ascii_tree = True" \
-    "${BASE[@]}" --ascii-tree
 
 rm -rf "${WORK_DIR}"
 

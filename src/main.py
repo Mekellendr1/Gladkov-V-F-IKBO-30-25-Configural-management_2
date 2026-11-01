@@ -1,9 +1,10 @@
-"""Entry point of the dependency graph tool (stage 2)."""
+"""Entry point of the dependency graph tool (stage 3)."""
 
 import json
 import sys
 
 from config import EXIT_ERROR, EXIT_OK, parse_args
+from graph import build_graph
 from nuget import (
     NuGetError,
     fetch_json,
@@ -13,35 +14,21 @@ from nuget import (
 )
 
 
-def normalize_deps(raw):
-    """Validate and normalize a raw dependency list."""
-    if not isinstance(raw, list):
-        raise ValueError("dependency list must be an array")
-    deps = []
-    for item in raw:
-        if not isinstance(item, dict):
-            raise ValueError("dependency entry must be an object")
-        if not isinstance(item.get("id"), str) or not item.get("id"):
-            raise ValueError("dependency entry must contain string id")
-        version = item.get("version", "")
-        if not isinstance(version, str):
-            raise ValueError("dependency version must be a string")
-        deps.append({"id": item["id"], "version": version})
-    return deps
-
-
-def fetch_nuget_dependencies(config):
-    """Return direct dependencies from a NuGet repository."""
+def make_nuget_fetcher(config):
+    """Return a function fetching direct deps from NuGet."""
     service_index = fetch_json(config["source"])
     package_base = find_package_base_url(service_index)
-    nuspec = fetch_nuspec(package_base,
-                          config["package"],
-                          config["version"])
-    return parse_dependencies(nuspec)
+
+    def fetch(package):
+        """Fetch direct dependencies of one NuGet package."""
+        nuspec = fetch_nuspec(package_base, package, config["version"])
+        return parse_dependencies(nuspec)
+
+    return fetch
 
 
-def fetch_test_dependencies(config):
-    """Return direct dependencies from a local test graph file."""
+def make_test_fetcher(config):
+    """Return a function fetching direct deps from a test graph."""
     try:
         with open(config["source"], "r", encoding="utf-8") as stream:
             graph = json.load(stream)
@@ -49,41 +36,66 @@ def fetch_test_dependencies(config):
         raise ValueError("test graph file is not valid JSON")
     except OSError:
         raise ValueError("cannot read test graph file")
-    versions = graph.get(config["package"])
-    if not isinstance(versions, dict):
-        raise ValueError("package %s not found in test graph"
-                         % config["package"])
-    deps = versions.get(config["version"])
-    if deps is None:
-        raise ValueError("package %s %s not found in test graph"
-                         % (config["package"], config["version"]))
-    return normalize_deps(deps)
+    if not isinstance(graph, dict):
+        raise ValueError("test graph must be a JSON object")
+
+    def fetch(package):
+        """Fetch direct dependencies from the test graph."""
+        deps = graph.get(package)
+        if deps is None:
+            raise ValueError("package %s not found in test graph" % package)
+        if not isinstance(deps, list):
+            raise ValueError("deps of %s must be a list" % package)
+        return deps
+
+    return fetch
 
 
-def print_dependencies(deps):
-    """Print direct dependencies as `id version` lines."""
-    if not deps:
-        print("(no dependencies)")
-        return
-    for dep in deps:
-        print("%s %s" % (dep["id"], dep["version"] or ""))
+def print_graph(graph, root):
+    """Print the dependency graph as `node -> child` lines."""
+    order = _graph_order(graph, root)
+    for node in order:
+        children = graph.get(node, [])
+        if not children:
+            print("%s -> (none)" % node)
+            continue
+        for child in children:
+            print("%s -> %s" % (node, child))
+
+
+def _graph_order(graph, root):
+    """Return nodes in DFS preorder starting from root."""
+    order = []
+    seen = set()
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        if node in seen:
+            continue
+        seen.add(node)
+        order.append(node)
+        for child in reversed(graph.get(node, [])):
+            if child not in seen:
+                stack.append(child)
+    return order
 
 
 def main(argv=None):
-    """Print direct dependencies or an error message."""
+    """Build the dependency graph and print it or an error."""
     try:
         config = parse_args(argv)
         if config["test_mode"]:
-            deps = fetch_test_dependencies(config)
+            fetch = make_test_fetcher(config)
         else:
-            deps = fetch_nuget_dependencies(config)
+            fetch = make_nuget_fetcher(config)
+        graph = build_graph(fetch, config["package"], config["max_depth"])
     except ValueError as error:
         print("ERROR: %s" % error, file=sys.stderr)
         return EXIT_ERROR
     except NuGetError as error:
         print("ERROR: %s" % error, file=sys.stderr)
         return EXIT_ERROR
-    print_dependencies(deps)
+    print_graph(graph, config["package"])
     return EXIT_OK
 
 

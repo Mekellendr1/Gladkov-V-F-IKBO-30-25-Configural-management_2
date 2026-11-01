@@ -1,4 +1,4 @@
-"""Entry point of the dependency graph tool (stage 3)."""
+"""Entry point of the dependency graph tool (stage 4)."""
 
 import json
 import sys
@@ -12,6 +12,7 @@ from nuget import (
     find_package_base_url,
     parse_dependencies,
 )
+from topo import load_order
 
 
 def make_nuget_fetcher(config):
@@ -74,6 +75,12 @@ def print_graph(graph, root):
             print("%s -> %s" % (node, child))
 
 
+def print_load_order(graph, root):
+    """Print the load order one package per line."""
+    for package in load_order(graph, root):
+        print(package)
+
+
 def _graph_order(graph, root):
     """Return real graph nodes in DFS preorder from root."""
     order = []
@@ -107,7 +114,10 @@ def main(argv=None):
     except NuGetError as error:
         print("ERROR: %s" % error, file=sys.stderr)
         return EXIT_ERROR
-    print_graph(graph, config["package"])
+    if config["load_order"]:
+        print_load_order(graph, config["package"])
+    else:
+        print_graph(graph, config["package"])
     return EXIT_OK
 
 

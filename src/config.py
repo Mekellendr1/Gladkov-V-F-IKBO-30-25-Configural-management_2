@@ -32,6 +32,8 @@ def build_parser():
                         help="package version (default: %(default)s)")
     parser.add_argument("--ascii-tree", action="store_true",
                         help="print dependencies as an ASCII tree")
+    parser.add_argument("--load-order", action="store_true",
+                    help="print the dependency load order")
     parser.add_argument("--max-depth", type=int, default=DEFAULT_MAX_DEPTH,
                         help="maximum analysis depth (default: %(default)s)")
     return parser
@@ -87,6 +89,7 @@ def parse_args(argv=None):
     config["source"] = validate_source(args.source, config["test_mode"])
     config["version"] = validate_version(args.version)
     config["max_depth"] = validate_max_depth(args.max_depth)
+    config["load_order"] = bool(args.load_order)
     return config
 
 

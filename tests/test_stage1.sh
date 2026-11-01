@@ -7,7 +7,7 @@ WORK_DIR="$(mktemp -d)"
 GRAPH_FILE="${WORK_DIR}/graph.json"
 FAILED=0
 
-printf '{"A": {"1.0.0": []}}\n' > "${GRAPH_FILE}"
+printf '{"A": []}\n' > "${GRAPH_FILE}"
 
 check_exit() {
     local title="$1"

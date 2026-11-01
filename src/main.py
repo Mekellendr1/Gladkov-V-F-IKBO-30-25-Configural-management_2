@@ -4,7 +4,7 @@ import json
 import sys
 
 from config import EXIT_ERROR, EXIT_OK, parse_args
-from graph import build_graph
+from graph import CYCLE_MARKER, build_graph
 from nuget import (
     NuGetError,
     fetch_json,
@@ -15,14 +15,18 @@ from nuget import (
 
 
 def make_nuget_fetcher(config):
-    """Return a function fetching direct deps from NuGet."""
+    """Return a cached function fetching direct deps from NuGet."""
     service_index = fetch_json(config["source"])
     package_base = find_package_base_url(service_index)
+    cache = {}
 
     def fetch(package):
         """Fetch direct dependencies of one NuGet package."""
-        nuspec = fetch_nuspec(package_base, package, config["version"])
-        return parse_dependencies(nuspec)
+        if package not in cache:
+            nuspec = fetch_nuspec(package_base, package,
+                                  config["version"])
+            cache[package] = parse_dependencies(nuspec)
+        return cache[package]
 
     return fetch
 
@@ -43,10 +47,9 @@ def make_test_fetcher(config):
             raise ValueError("deps of %s must be a list" % package)
         for dep in deps:
             if not isinstance(dep, dict):
-                raise ValueError("dependency of %s must be an object"
-                                 % package)
+                raise ValueError("dep of %s must be an object" % package)
             if not isinstance(dep.get("id"), str) or not dep.get("id"):
-                raise ValueError("dependency of %s must have string id"
+                raise ValueError("dep of %s must have string id"
                                  % package)
 
     def fetch(package):
@@ -62,8 +65,7 @@ def make_test_fetcher(config):
 
 def print_graph(graph, root):
     """Print the dependency graph as `node -> child` lines."""
-    order = _graph_order(graph, root)
-    for node in order:
+    for node in _graph_order(graph, root):
         children = graph.get(node, [])
         if not children:
             print("%s -> (none)" % node)
@@ -73,18 +75,18 @@ def print_graph(graph, root):
 
 
 def _graph_order(graph, root):
-    """Return nodes in DFS preorder starting from root."""
+    """Return real graph nodes in DFS preorder from root."""
     order = []
     seen = set()
     stack = [root]
     while stack:
         node = stack.pop()
-        if node in seen:
+        if node in seen or node not in graph:
             continue
         seen.add(node)
         order.append(node)
         for child in reversed(graph.get(node, [])):
-            if child not in seen:
+            if child not in seen and child in graph:
                 stack.append(child)
     return order
 
@@ -97,9 +99,8 @@ def main(argv=None):
             fetch = make_test_fetcher(config)
         else:
             fetch = make_nuget_fetcher(config)
-        # Проверяем, что корневой пакет существует (фатальная ошибка).
-        fetch(config["package"])
-        graph = build_graph(fetch, config["package"], config["max_depth"])
+        graph = build_graph(fetch, config["package"],
+                            config["max_depth"])
     except ValueError as error:
         print("ERROR: %s" % error, file=sys.stderr)
         return EXIT_ERROR

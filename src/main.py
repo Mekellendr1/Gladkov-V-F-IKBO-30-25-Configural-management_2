@@ -1,4 +1,4 @@
-"""Entry point of the dependency graph tool (stage 4)."""
+"""Entry point of the dependency graph tool (stage 5)."""
 
 import json
 import sys
@@ -13,6 +13,7 @@ from nuget import (
     parse_dependencies,
 )
 from topo import load_order
+from viz import generate_ascii_tree, generate_dot
 
 
 def make_nuget_fetcher(config):
@@ -81,6 +82,19 @@ def print_load_order(graph, root):
         print(package)
 
 
+def print_ascii_tree(graph, root):
+    """Print the dependency graph as an ASCII tree."""
+    print(generate_ascii_tree(graph, root))
+
+
+def save_dot(graph, root, filename):
+    """Save the dependency graph as a DOT file."""
+    dot = generate_dot(graph, root)
+    with open(filename, "w", encoding="utf-8") as stream:
+        stream.write(dot)
+    print("DOT file saved: %s" % filename)
+
+
 def _graph_order(graph, root):
     """Return real graph nodes in DFS preorder from root."""
     order = []
@@ -114,10 +128,16 @@ def main(argv=None):
     except NuGetError as error:
         print("ERROR: %s" % error, file=sys.stderr)
         return EXIT_ERROR
+    
     if config["load_order"]:
         print_load_order(graph, config["package"])
+    elif config["ascii_tree"]:
+        print_ascii_tree(graph, config["package"])
     else:
         print_graph(graph, config["package"])
+        dot_filename = "%s.dot" % config["package"]
+        save_dot(graph, config["package"], dot_filename)
+    
     return EXIT_OK
 
 

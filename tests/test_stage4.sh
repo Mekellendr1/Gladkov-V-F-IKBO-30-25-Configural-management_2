@@ -80,6 +80,22 @@ check_absent() {
     fi
 }
 
+check_absent() {
+    local title="$1"
+    local needle="$2"
+    shift 2
+    local output
+    if ! output="$("$@" 2>&1)"; then
+        echo "FAIL: ${title} (command failed)"
+        FAILED=1
+    elif printf "%s\n" "${output}" | grep -qF -- "${needle}"; then
+        echo "FAIL: ${title} (unexpected '${needle}')"
+        FAILED=1
+    else
+        echo "PASS: ${title}"
+    fi
+}
+
 check_order() {
     local title="$1"
     local before="$2"

@@ -21,13 +21,13 @@ def make_nuget_fetcher(config):
     package_base = find_package_base_url(service_index)
     cache = {}
 
-    def fetch(package):
+    def fetch(package_id, version):
         """Fetch direct dependencies of one NuGet package."""
-        if package not in cache:
-            nuspec = fetch_nuspec(package_base, package,
-                                  config["version"])
-            cache[package] = parse_dependencies(nuspec)
-        return cache[package]
+        key = (package_id, version)
+        if key not in cache:
+            nuspec = fetch_nuspec(package_base, package_id, version)
+            cache[key] = parse_dependencies(nuspec)
+        return cache[key]
 
     return fetch
 
@@ -53,12 +53,12 @@ def make_test_fetcher(config):
                 raise ValueError("dep of %s must have string id"
                                  % package)
 
-    def fetch(package):
+    def fetch(package_id, version):
         """Fetch direct dependencies from the test graph."""
-        deps = graph.get(package)
+        deps = graph.get(package_id)
         if deps is None:
             raise ValueError("package %s not found in test graph"
-                             % package)
+                             % package_id)
         return deps
 
     return fetch
@@ -107,7 +107,7 @@ def main(argv=None):
         else:
             fetch = make_nuget_fetcher(config)
         graph = build_graph(fetch, config["package"],
-                            config["max_depth"])
+                            config["version"], config["max_depth"])
     except ValueError as error:
         print("ERROR: %s" % error, file=sys.stderr)
         return EXIT_ERROR

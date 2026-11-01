@@ -64,6 +64,22 @@ check_output() {
     fi
 }
 
+check_absent() {
+    local title="$1"
+    local needle="$2"
+    shift 2
+    local output
+    if ! output="$("$@" 2>&1)"; then
+        echo "FAIL: ${title} (command failed)"
+        FAILED=1
+    elif printf "%s\n" "${output}" | grep -qF -- "${needle}"; then
+        echo "FAIL: ${title} (unexpected '${needle}')"
+        FAILED=1
+    else
+        echo "PASS: ${title}"
+    fi
+}
+
 check_order() {
     local title="$1"
     local before="$2"
@@ -117,7 +133,7 @@ check_exit "cycle order exits 0" 0 "${RUN_SH}" --package A \
 
 check_order "depth order C before A" "C" "A" "${RUN_SH}" --package A \
     --source "${DEEP_FILE}" "${ARGS[@]}" --load-order --max-depth 3
-check_output "depth order no marker" "(depth limit)" "${RUN_SH}" --package A \
+check_absent "depth order no marker" "(depth limit)" "${RUN_SH}" --package A \
     --source "${DEEP_FILE}" "${ARGS[@]}" --load-order --max-depth 1
 check_exit "depth order exits 0" 0 "${RUN_SH}" --package A \
     --source "${DEEP_FILE}" "${ARGS[@]}" --load-order --max-depth 1

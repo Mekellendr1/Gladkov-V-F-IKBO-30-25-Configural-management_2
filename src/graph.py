@@ -5,41 +5,36 @@ DEPTH_LIMIT_MARKER = "(depth limit)"
 
 
 def build_graph(fetch_deps, root, max_depth):
-    """Build the dependency graph by recursive DFS.
-
-    fetch_deps(package) returns direct dependencies as a list of
-    dicts with key "id". Cycles are cut with CYCLE_MARKER and the
-    depth limit is marked with DEPTH_LIMIT_MARKER.
-    """
+    """Build the dependency graph by recursive DFS."""
     graph = {}
     visiting = set()
-    _visit(graph, visiting, fetch_deps, root, 0, max_depth)
+    root_children = _visit(graph, visiting, fetch_deps, root, 0, max_depth)
+    graph[root] = root_children
     return graph
 
 
 def _visit(graph, visiting, fetch_deps, package, depth, max_depth):
-    """Visit one node and recurse into its dependencies."""
+    """Visit one node and return list of children labels for parent."""
     if package in graph:
-        return
+        return [package]
     if package in visiting:
-        graph[package] = [CYCLE_MARKER]
-        return
+        return [CYCLE_MARKER]
     if depth >= max_depth:
-        graph[package] = [DEPTH_LIMIT_MARKER]
-        return
+        return [DEPTH_LIMIT_MARKER]
     visiting.add(package)
     try:
         deps = fetch_deps(package)
     except Exception as error:
-        graph[package] = ["(error: %s)" % error]
         visiting.discard(package)
-        return
+        return ["(error: %s)" % error]
     children = []
     for dep in deps:
         dep_id = dep.get("id")
         if not dep_id:
             continue
-        children.append(dep_id)
-        _visit(graph, visiting, fetch_deps, dep_id, depth + 1, max_depth)
-    graph[package] = children
+        child_label = _visit(graph, visiting, fetch_deps, dep_id, depth + 1, max_depth)
+        if dep_id not in graph and dep_id not in visiting:
+            graph[dep_id] = child_label
+        children.extend(child_label)
     visiting.discard(package)
+    return [package]

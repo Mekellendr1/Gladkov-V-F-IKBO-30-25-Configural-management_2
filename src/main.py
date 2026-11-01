@@ -38,14 +38,23 @@ def make_test_fetcher(config):
         raise ValueError("cannot read test graph file")
     if not isinstance(graph, dict):
         raise ValueError("test graph must be a JSON object")
+    for package, deps in graph.items():
+        if not isinstance(deps, list):
+            raise ValueError("deps of %s must be a list" % package)
+        for dep in deps:
+            if not isinstance(dep, dict):
+                raise ValueError("dependency of %s must be an object"
+                                 % package)
+            if not isinstance(dep.get("id"), str) or not dep.get("id"):
+                raise ValueError("dependency of %s must have string id"
+                                 % package)
 
     def fetch(package):
         """Fetch direct dependencies from the test graph."""
         deps = graph.get(package)
         if deps is None:
-            raise ValueError("package %s not found in test graph" % package)
-        if not isinstance(deps, list):
-            raise ValueError("deps of %s must be a list" % package)
+            raise ValueError("package %s not found in test graph"
+                             % package)
         return deps
 
     return fetch
@@ -88,6 +97,8 @@ def main(argv=None):
             fetch = make_test_fetcher(config)
         else:
             fetch = make_nuget_fetcher(config)
+        # Проверяем, что корневой пакет существует (фатальная ошибка).
+        fetch(config["package"])
         graph = build_graph(fetch, config["package"], config["max_depth"])
     except ValueError as error:
         print("ERROR: %s" % error, file=sys.stderr)

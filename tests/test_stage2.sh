@@ -73,9 +73,14 @@ check_exit "test mode deps not a list" 2 "${RUN_SH}" --package A \
 check_exit "test mode bad json" 2 "${RUN_SH}" --package A \
     --source "${BAD_JSON}" --test-mode --max-depth 5
 
-if command -v curl >/dev/null 2>&1 \
-    && curl -fsSI https://api.nuget.org/ >/dev/null 2>&1; then
-    GOOD_URL="https://api.nuget.org/v3/index.json"
+GOOD_URL="https://api.nuget.org/v3/index.json"
+
+net_ok() {
+    python3 -c "import urllib.request as u; u.urlopen('${GOOD_URL}', timeout=30)" \
+        > /dev/null 2>&1
+}
+
+if net_ok; then
     check_exit "nuget newtonsoft exits 0" 0 "${RUN_SH}" \
         --package Newtonsoft.Json --source "${GOOD_URL}" \
         --version 13.0.3 --max-depth 2

@@ -6,7 +6,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 
 PACKAGE_BASE_RESOURCE = "PackageBaseAddress/3.0.0"
-TIMEOUT = 15
+TIMEOUT = 30
 
 
 class NuGetError(Exception):

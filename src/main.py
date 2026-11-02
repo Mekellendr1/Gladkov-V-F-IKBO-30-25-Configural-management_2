@@ -4,7 +4,7 @@ import json
 import sys
 
 from config import EXIT_ERROR, EXIT_OK, parse_args
-from graph import CYCLE_MARKER, build_graph
+from graph import build_graph
 from nuget import (
     NuGetError,
     fetch_json,
@@ -128,7 +128,7 @@ def main(argv=None):
     except NuGetError as error:
         print("ERROR: %s" % error, file=sys.stderr)
         return EXIT_ERROR
-    
+
     if config["load_order"]:
         print_load_order(graph, config["package"])
     elif config["ascii_tree"]:
@@ -137,7 +137,7 @@ def main(argv=None):
         print_graph(graph, config["package"])
         dot_filename = "%s.dot" % config["package"]
         save_dot(graph, config["package"], dot_filename)
-    
+
     return EXIT_OK
 
 

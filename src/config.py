@@ -33,7 +33,7 @@ def build_parser():
     parser.add_argument("--ascii-tree", action="store_true",
                         help="print dependencies as an ASCII tree")
     parser.add_argument("--load-order", action="store_true",
-                    help="print the dependency load order")
+                        help="print the dependency load order")
     parser.add_argument("--max-depth", type=int, default=DEFAULT_MAX_DEPTH,
                         help="maximum analysis depth (default: %(default)s)")
     return parser

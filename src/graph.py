@@ -11,13 +11,15 @@ def build_graph(fetch_deps, root_id, root_version, max_depth):
     """
     graph = {}
     on_path = set()
-    problem = _visit(graph, on_path, fetch_deps, root_id, root_version, 0, max_depth)
+    problem = _visit(graph, on_path, fetch_deps, root_id,
+                     root_version, 0, max_depth)
     if problem is not None:
         raise ValueError(problem)
     return graph
 
 
-def _visit(graph, on_path, fetch_deps, package_id, package_version, depth, max_depth):
+def _visit(graph, on_path, fetch_deps, package_id, package_version,
+           depth, max_depth):
     """Fill graph[package_id]; return cycle marker, error text or None."""
     if package_id in graph:
         return None
@@ -38,8 +40,8 @@ def _visit(graph, on_path, fetch_deps, package_id, package_version, depth, max_d
         dep_version = dep.get("version", "")
         if not dep_id:
             continue
-        result = _visit(
-            graph, on_path, fetch_deps, dep_id, dep_version, depth + 1, max_depth)
+        result = _visit(graph, on_path, fetch_deps, dep_id,
+                        dep_version, depth + 1, max_depth)
         if result is None:
             children.append(dep_id)
         elif result == CYCLE_MARKER:

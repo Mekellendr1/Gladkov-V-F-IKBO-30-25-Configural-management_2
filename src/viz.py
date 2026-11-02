@@ -5,62 +5,85 @@ from graph import CYCLE_MARKER, DEPTH_LIMIT_MARKER
 
 def generate_dot(graph, root):
     """Generate a DOT representation of the dependency graph."""
-    lines = ["digraph dependencies {"]
-    lines.append("    rankdir=LR;")
-    lines.append("    node [shape=box, style=filled, fillcolor=lightblue];")
-    
+    lines = ["digraph dependencies {",
+             "    rankdir=LR;",
+             "    node [shape=box, style=filled, fillcolor=lightblue];"]
     for node in _order(graph, root):
         children = graph.get(node, [])
         if not children:
-            lines.append('    "%s" [fillcolor=lightgreen];' % node)
+            lines.append(_leaf_line(node))
             continue
         for child in children:
-            if child == CYCLE_MARKER:
-                lines.append('    "%s" -> "CYCLE_%s" [style=dashed, color=red];' % (node, node))
-                lines.append('    "CYCLE_%s" [label="(cycle)", shape=ellipse, fillcolor=yellow];' % node)
-            elif child == DEPTH_LIMIT_MARKER:
-                lines.append('    "%s" -> "LIMIT_%s" [style=dashed, color=gray];' % (node, node))
-                lines.append('    "LIMIT_%s" [label="(depth limit)", shape=ellipse, fillcolor=lightgray];' % node)
-            elif child.startswith("(error:"):
-                lines.append('    "%s" -> "ERROR_%s" [style=dashed, color=orange];' % (node, node))
-                lines.append('    "ERROR_%s" [label="%s", shape=ellipse, fillcolor=orange];' % (node, child))
-            else:
-                lines.append('    "%s" -> "%s";' % (node, child))
-    
+            lines.extend(_edge_lines(node, child))
     lines.append("}")
     return "\n".join(lines)
+
+
+def _leaf_line(node):
+    """DOT line marking a leaf node."""
+    return '    "%s" [fillcolor=lightgreen];' % node
+
+
+def _edge_lines(node, child):
+    """DOT lines for one edge from node to child."""
+    if child == CYCLE_MARKER:
+        return _marker_lines(node, child, "CYCLE", "(cycle)", "red", "yellow")
+    if child == DEPTH_LIMIT_MARKER:
+        return _marker_lines(node, child, "LIMIT",
+                             "(depth limit)", "gray", "lightgray")
+    if child.startswith("(error:"):
+        return _marker_lines(node, child, "ERROR", child, "orange", "orange")
+    return ['    "%s" -> "%s";' % (node, child)]
+
+
+def _marker_lines(node, child, kind, label, edge_color, node_color):
+    """DOT lines for an edge pointing to a virtual marker node."""
+    vid = "%s_%s" % (kind, node)
+    edge = ('    "%s" -> "%s" [style=dashed, color=%s];'
+            % (node, vid, edge_color))
+    vnode = ('    "%s" [label="%s", shape=ellipse, fillcolor=%s];'
+             % (vid, label, node_color))
+    return [edge, vnode]
+
+
+def _prefix(indent, last):
+    """Return the branch prefix for a node line."""
+    return indent + ("└── " if last else "├── ")
+
+
+def _render_children(graph, children, new_indent, visited):
+    """Render all child lines of a single node."""
+    lines = []
+    total = len(children)
+    for i, child in enumerate(children):
+        is_last = (i == total - 1)
+        head = _prefix(new_indent, is_last)
+        if child == CYCLE_MARKER:
+            lines.append(head + "(cycle)\n")
+        elif child == DEPTH_LIMIT_MARKER:
+            lines.append(head + "(depth limit)\n")
+        elif child.startswith("(error:"):
+            lines.append(head + child + "\n")
+        else:
+            lines.append(generate_ascii_tree(
+                graph, child, new_indent, is_last, visited))
+    return "".join(lines)
 
 
 def generate_ascii_tree(graph, root, indent="", last=True, visited=None):
     """Generate an ASCII tree representation of the dependency graph."""
     if visited is None:
         visited = set()
-    
+    head = _prefix(indent, last)
     if root in visited:
-        return indent + ("└── " if last else "├── ") + root + " (cycle)\n"
-    
-    visited.add(root)
+        return head + root + " (cycle)\n"
+    visited = visited | {root}
     children = graph.get(root, [])
-    
     if not children:
-        return indent + ("└── " if last else "├── ") + root + "\n"
-    
-    result = indent + ("└── " if last else "├── ") + root + "\n"
-    
+        return head + root + "\n"
     new_indent = indent + ("    " if last else "│   ")
-    
-    for i, child in enumerate(children):
-        is_last = (i == len(children) - 1)
-        if child == CYCLE_MARKER:
-            result += new_indent + ("└── " if is_last else "├── ") + "(cycle)\n"
-        elif child == DEPTH_LIMIT_MARKER:
-            result += new_indent + ("└── " if is_last else "├── ") + "(depth limit)\n"
-        elif child.startswith("(error:"):
-            result += new_indent + ("└── " if is_last else "├── ") + child + "\n"
-        else:
-            result += generate_ascii_tree(graph, child, new_indent, is_last, visited.copy())
-    
-    return result
+    return head + root + "\n" + _render_children(
+        graph, children, new_indent, visited)
 
 
 def _order(graph, root):

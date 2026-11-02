@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 
 PACKAGE_BASE_RESOURCE = "PackageBaseAddress/3.0.0"
 TIMEOUT = 30
+HTTP_NOT_FOUND = 404
 
 
 class NuGetError(Exception):
@@ -54,7 +55,7 @@ def fetch_nuspec(package_base, package_id, version):
         with urllib.request.urlopen(url, timeout=TIMEOUT) as response:
             return response.read().decode("utf-8")
     except urllib.error.HTTPError as error:
-        if error.code == 404:
+        if error.code == HTTP_NOT_FOUND:
             raise NuGetError("package %s %s not found"
                              % (package_id, version))
         raise NuGetError("HTTP %d fetching %s" % (error.code, url))

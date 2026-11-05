@@ -3,7 +3,7 @@
 import json
 import urllib.error
 import urllib.request
-import xml.etree.ElementTree as ET
+from xml.etree.ElementTree import ParseError, fromstring
 
 PACKAGE_BASE_RESOURCE = "PackageBaseAddress/3.0.0"
 TIMEOUT = 30
@@ -66,8 +66,8 @@ def fetch_nuspec(package_base, package_id, version):
 def parse_dependencies(nuspec_xml):
     """Extract direct dependencies from the nuspec XML document."""
     try:
-        root = ET.fromstring(nuspec_xml)
-    except ET.ParseError:
+        root = fromstring(nuspec_xml)
+    except ParseError:
         raise NuGetError("invalid nuspec XML")
     deps = []
     seen = set()
